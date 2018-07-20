@@ -1,0 +1,41 @@
+language: go
+notifications:
+  email: false
+go: 1.9.x
+os:
+  - linux
+  - osx
+
+env: GO_BUILD_LDFLAGS="-s -w -X main.commitHash=$(git rev-parse --short HEAD 2>/dev/null) -X main.buildDate=$(date '+%Y-%m-%d') -X main.version=$(git describe --tags --dirty)"
+
+addons:
+  apt:
+    packages:
+      - sqlite3
+      - gcc-mingw-w64
+
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install sqlite; fi
+install: skip
+
+before_script:
+  - go get github.com/golang/dep/cmd/dep
+  - dep ensure
+script:
+  - go build -v ./...
+
+before_deploy:
+  - mkdir -p release
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then CGO_ENABLED=1 GOARCH=amd64 GOOS=windows CC=x86_64-w64-mingw32-gcc go build -ldflags "$GO_BUILD_LDFLAGS" -o release/gmusic_activity-windows-amd64.exe ./gmusic_activity; fi
+  - go build -ldflags "$GO_BUILD_LDFLAGS" -o release/gmusic_activity-$(go env GOHOSTOS)-$(go env GOHOSTARCH) ./gmusic_activity
+deploy:
+  provider: releases
+  api_key:
+    secure: Ja05pNRs3jFBxlDQrEwloD3IF/Z4UeFGqNOFImG3EKdzJSguQt37AmlGMVj7GH73MrbVL3MLszRFOrIN+qnTYmE4wr8vD3OpZLLIQJUclOYy9gOOmEbKzEsvacNCIOGqAMq/N/1/4n0ivxos0EubdNQV5H3nEFMwY+zgcxtdP2JPoQovS8Pago5EsYrvmUFX4biaycXmOPbDqlrnc9ZUSeQdEoVFENybqDQYH9/8g91MtWnlEqW6ZDnPh3Q4teKrd4J/YKBwrgdAlFuhayVGsg1/9wy7iqfYGQ8hJ6RcPIN14yUgVhX94wHMyTFlze7nVwyuaQDIiJgpkcTERjPvhr2O82f3fFkvHqFT6Qfnry03dpjbcB/sa828qmvs6NZT9LcMbqVpVzDPkrNUmHqoSpJs7yoMOWqJnOqsHoMLp2k4m9V1q5mDQI+tWv+COFo4tbgsZZdzGfhXknroyj2gnNdUe21VQz5INxXooIb5LXd/es9Pouxe/dzGK/uShNpUh5CPDoz+mS0o/Qg8hLGgsnLk0vQRQxJYPBevsz445TzHWKaUNA3BsIlkH07xvJ02tdoWPXGvdM+jJh9x60TCLVms8EbbkAWb0O+tsK49L3Wy01T2+qTfyMA87fMDiCzbgIyKpg/LHhfhwrq7Q3+8fuO2w27c4UazSHxuHr15JcY=
+  file_glob: true
+  file: release/*
+  skip_cleanup: true
+  on:
+    repo: jpathy/google-myactivity
+    branch: master
+    tags: true
